@@ -114,15 +114,21 @@ class Accept(Thread):
                         sock.sendall(filebuffer[self.user])
                         filebuffer.pop(self.user)
                         break
-
             sendReject = re.match('sendfileReject (.*) (.*)', message)
             if sendReject:
                 sendfileSignal[sendReject.group(1)]='Reject'
-
-
-
-
-
+            if message=='friendlist':
+                message = "******   Your Friend List   ******\n"
+                query = db.execute('SELECT * FROM friend WHERE user="{}"'.format(self.user))
+                rows = query.fetchall()
+                if len(rows)!=0:
+                    for row in rows:
+                        if row[2] in online:
+                            message+="{} online\n".format(row[2])
+                        else:
+                            message+="{} offline\n".format(row[2])
+                message+="**********************************\n"
+                sock.sendall(message.encode('ascii'))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="A chat server")
