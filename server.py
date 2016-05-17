@@ -117,16 +117,17 @@ class Accept(Thread):
             sendReject = re.match('sendfileReject (.*) (.*)', message)
             if sendReject:
                 sendfileSignal[sendReject.group(1)]='Reject'
-            if message=='friendlist':
+            listFriend = re.match('friend list', message)
+            if listFriend:
                 message = "******   Your Friend List   ******\n"
                 query = db.execute('SELECT * FROM friend WHERE user="{}"'.format(self.user))
                 rows = query.fetchall()
                 if len(rows)!=0:
                     for row in rows:
                         if row[2] in online:
-                            message+="{} online\n".format(row[2])
+                            message+="{}\tonline\n".format(row[2])
                         else:
-                            message+="{} offline\n".format(row[2])
+                            message+="{}\toffline\n".format(row[2])
                 message+="**********************************\n"
                 sock.sendall(message.encode('ascii'))
             addFriend = re.match('friend add (.*)', message)
@@ -147,6 +148,19 @@ class Accept(Thread):
                         message = "Add {} as your friend".format(addFriend.group(1))
                         sock.sendall(message.encode('ascii'))
                         con.commit()
+            removeFriend = re.match('friend remove (.+)', message)
+            if removeFriend:
+                query = db.execute('SELECT * FROM friend WHERE user="{}" AND friend="{}"'.format(self.user,removeFriend.group(1)))
+                rows = query.fetchall()
+                if len(rows)==0:
+                    message = "{} is not in your friendlist".format(removeFriend.group(1))
+                    sock.sendall(message.encode('ascii'))
+                else:
+                    db.execute('DELETE FROM friend WHERE user="{}" AND friend="{}"'.format(self.user,removeFriend.group(1)))
+                    con.commit()
+                    message = "{} has been remove from your friends".format(removeFriend.group(1))
+                    sock.sendall(message.encode('ascii'))
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="A chat server")
