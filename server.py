@@ -6,7 +6,8 @@ import sqlite3
 from threading import Thread
 
 online={}
-offlineMsg={}
+sendfileSignal={}
+filebuffer={}
 
 def server(port):
     listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -27,7 +28,8 @@ class Accept(Thread):
         con = sqlite3.connect('user.db')
         db = con.cursor()
         global online
-        global offlineMsg
+        global sendfileSignal
+        global filebuffer
         sock, address = self.listener.accept()
         message = sock.recv(1024).decode('ascii')
         new = re.match('new (.*),(.*)',message)
@@ -59,7 +61,7 @@ class Accept(Thread):
         if len(msgs)!=0:
             message = "********   Offline Message   ********\n"
             for msg in msgs:
-                message += "<{}  {}> {}\n".format(msg[2], msg[4], msg[3])
+                message += "<{}  {}> {}\n".format(msg[1], msg[4], msg[3])
             message += "*************************************\n"
             sock.sendall(message.encode('ascii')) 
             db.execute('DELETE FROM offmsg where receiver="{}"'.format(self.user))
@@ -67,14 +69,60 @@ class Accept(Thread):
         while True:
             message = sock.recv(1024)
             message = message.decode('ascii')
-            send = re.match('send\s+(.*)\s+(.*)',message)
-            if send and send.group(1) in online:
-                message = '<%s> %s' % (self.user, send.group(2))
-                online[send.group(1)].sendall(message.encode('ascii'))
-                sock.sendall(message.encode('ascii'))
-            else:
-                db.execute('INSERT INTO offmsg (sender, receiver,content) VALUES ("{}","{}","{}")'.format(self.user, send.group(1), send.group(2)))
-                con.commit()
+            send = re.match('send\s+(.*)\s+(.*)', message)
+            if send:
+                if send.group(1) in online:
+                    message = '<%s> %s' % (self.user, send.group(2))
+                    online[send.group(1)].sendall(message.encode('ascii'))
+                    sock.sendall(message.encode('ascii'))
+                else:
+                    db.execute('INSERT INTO offmsg (sender, receiver,content) VALUES ("{}","{}","{}")'.format(self.user, send.group(1), send.group(2)))
+                    con.commit()
+            logout = re.match('logout', message)
+            if logout:
+                online.pop(self.user)
+                sock.sendall(b'logout')
+                sock.close()
+                return
+            sendfile = re.match('sendfile\s+(.*)\s+(.*)\s(.*)', message)
+            if sendfile:
+                target = sendfile.group(1)
+                filename = sendfile.group(2)
+                filesize = sendfile.group(3)
+                message = "sendfile {},{},{}".format(self.user,filename,filesize)
+                online[target].sendall(message.encode('ascii'))
+                while True:
+                    if self.user in sendfileSignal:
+                        if sendfileSignal[self.user]=='Accept':
+                            sendfileSignal.pop(self.user)
+                            message = "SendfileACK Accept"
+                            sock.sendall(message.encode('ascii'))
+                            filebuffer[target]=sock.recv(int(filesize))
+                            break
+                        else:
+                            sendfileSignal.pop(self.user)
+                            message = "SendfileACK Reject"
+                            sock.sendall(message.encode('ascii'))
+                            break
+
+            sendAccept = re.match('sendfileAccept (.*) (.*)', message)
+            if sendAccept:               
+                sendfileSignal[sendAccept.group(1)]='Accept'
+                filesize=sendAccept.group(2)
+                while True:
+                    if self.user in filebuffer:
+                        sock.sendall(filebuffer[self.user])
+                        filebuffer.pop(self.user)
+                        break
+
+            sendReject = re.match('sendfileReject (.*) (.*)', message)
+            if sendReject:
+                sendfileSignal[sendReject.group(1)]='Reject'
+
+
+
+
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="A chat server")

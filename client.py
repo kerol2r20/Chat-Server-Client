@@ -2,9 +2,12 @@ import socket
 import threading
 import queue
 import re
+import os
 from getpass import getpass
 
 queueinput = queue.Queue()
+prefix = ""
+sendfileRequest = {}
 
 class ServerReply(threading.Thread):
     def __init__(self,user,pw):
@@ -21,23 +24,73 @@ class ServerReply(threading.Thread):
         message = sock.recv(1024).decode('ascii')
         if(message=="succ"):
             print("Login Success")
-            threading.Thread(target=sendMsg,args=(sock,)).start()
+            threading.Thread(target=RecvMsg,args=(sock,)).start()
             while True:
                 while not queueinput.empty():
                     message = queueinput.get()
-                    message = message.encode('ascii')
-                    sock.sendall(message)
-                    # reply = sock.recv(1024).decode('ascii')
-                    # print(reply)
+                    file = re.match('sendfile\s+(.*)\s(.*)', message)
+                    if file:
+                        if os.path.isfile(file.group(2)):
+                            size = os.stat(file.group(2)).st_size
+                            # binary = open(file.group(2),'rb')
+                            message = "sendfile {} {} {}".format(file.group(1),file.group(2),str(size))
+                            sock.sendall(message.encode('ascii'))
+                            while 'Ack' not in sendfileRequest:
+                                pass
+                            if sendfileRequest['Ack']=='Accept':
+                                print("We can start transfer file")
+                                sendfileRequest.pop('Ack')
+                                binary = open(file.group(2),'rb')
+                                print("Load file to buffer...")
+                                buff = binary.read()
+                                sock.sendall(buff)
+                                print("Upload complete")
+                            else:
+                                print("We can't send file  QQ")
+                                sendfileRequest.pop('Ack')
+                        else:
+                            print("File is not exist")
+                    else:
+                        # Accept send file
+                        global prefix
+                        sendfileACK = re.match("sendfileACK (.*) (.*)",prefix)
+                        if sendfileACK:
+                            if message=='y':
+                                message = "sendfileAccept {} {}".format(sendfileACK.group(1),sendfileACK.group(2))
+                            else:
+                                message = "sendfileReject {} {}".format(sendfileACK.group(1),sendfileACK.group(2))
+                            prefix = ""
+                        message = message.encode('ascii')
+                        sock.sendall(message)
         else:
             print("Login Error")
             sock.close()
 
-def sendMsg(sock):
+def RecvMsg(sock):
+    global sendfileRequest
     while True:
         reply = sock.recv(1024)
         reply = reply.decode('ascii')
-        print(reply)
+        sendfile = re.match("sendfile (.*),(.*),(.*)",reply)
+        if sendfile:
+            print("{} will send you {} with {} byte. Would you want it (y/n)?".format(sendfile.group(1),sendfile.group(2),sendfile.group(3)))
+            global prefix
+            prefix="sendfileACK {} {}".format(sendfile.group(1),sendfile.group(3))
+            buff = sock.recv(int(sendfile.group(3)))
+            f = open(sendfile.group(2),'wb')
+            f.write(buff)
+            f.close()
+        if reply=='logout':
+            print('Disconnect to chat server. Socket close...')
+            sock.close()
+            return
+        if reply=='SendfileACK Accept':
+            sendfileRequest['Ack']='Accept'
+        if reply=='SendfileACK Reject':
+            sendfileRequest['Ack']='Reject'  
+        else:
+            print(reply)
+
 
 class inputMes(threading.Thread):
     def __init__(self):
@@ -58,4 +111,3 @@ if __name__ == '__main__':
     inputM.start()
     server.join()
     inputM.join()
-
