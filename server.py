@@ -129,6 +129,24 @@ class Accept(Thread):
                             message+="{} offline\n".format(row[2])
                 message+="**********************************\n"
                 sock.sendall(message.encode('ascii'))
+            addFriend = re.match('friend add (.*)', message)
+            if addFriend:
+                query = db.execute('SELECT * FROM user WHERE name="{}"'.format(addFriend.group(1)))
+                rows = query.fetchall()
+                if len(rows)==0:
+                    message = "The user {} is not exist.".format(addFriend.group(1))
+                    sock.sendall(message.encode('ascii'))
+                else:
+                    query = db.execute('SELECT * FROM friend WHERE user="{}" AND friend="{}"'.format(self.user,addFriend.group(1)))
+                    rows = query.fetchall()
+                    if len(rows)!=0:
+                        message = "{} have been your friend".format(addFriend.group(1))
+                        sock.sendall(message.encode('ascii'))
+                    else:
+                        db.execute('INSERT INTO friend (user,friend) VALUES ("{}","{}")'.format(self.user,addFriend.group(1)))
+                        message = "Add {} as your friend".format(addFriend.group(1))
+                        sock.sendall(message.encode('ascii'))
+                        con.commit()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="A chat server")
