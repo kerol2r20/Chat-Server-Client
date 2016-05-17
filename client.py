@@ -60,6 +60,13 @@ class ServerReply(threading.Thread):
                             else:
                                 message = "sendfileReject {} {}".format(sendfileACK.group(1),sendfileACK.group(2))
                             prefix = ""
+                        chatRequest = re.match("chatRequest (.*)",prefix)
+                        if chatRequest:
+                        	if message=='y':
+                        		message = "chatAccept {}".format(chatRequest.group(1))
+                        	else:
+                        		message = "chatReject {}".format(chatRequest.group(1))
+                        	prefix = ""
                         message = message.encode('ascii')
                         sock.sendall(message)
         else:
@@ -68,13 +75,13 @@ class ServerReply(threading.Thread):
 
 def RecvMsg(sock):
     global sendfileRequest
+    global prefix
     while True:
         reply = sock.recv(1024)
         reply = reply.decode('ascii')
         sendfile = re.match("sendfile (.*),(.*),(.*)",reply)
         if sendfile:
             print("{} will send you {} with {} byte. Would you want it (y/n)?".format(sendfile.group(1),sendfile.group(2),sendfile.group(3)))
-            global prefix
             prefix="sendfileACK {} {}".format(sendfile.group(1),sendfile.group(3))
             buff = sock.recv(int(sendfile.group(3)))
             f = open(sendfile.group(2),'wb')
@@ -88,6 +95,11 @@ def RecvMsg(sock):
             sendfileRequest['Ack']='Accept'
         if reply=='SendfileACK Reject':
             sendfileRequest['Ack']='Reject'  
+        chatRequest = re.match("chatRequest (.+)",reply)
+        if chatRequest:
+        	target = chatRequest.group(1)
+        	print("{} want to chat with you. World you want to (y/n)?".format(target))
+        	prefix="chatRequest {}".format(target)
         else:
             print(reply)
 

@@ -8,6 +8,8 @@ from threading import Thread
 online={}
 sendfileSignal={}
 filebuffer={}
+chatSignal={}
+chatMode={}
 
 def server(port):
     listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -30,6 +32,8 @@ class Accept(Thread):
         global online
         global sendfileSignal
         global filebuffer
+        global chatSignal
+        global chatMode
         sock, address = self.listener.accept()
         message = sock.recv(1024).decode('ascii')
         new = re.match('new (.*),(.*)',message)
@@ -69,6 +73,15 @@ class Accept(Thread):
         while True:
             message = sock.recv(1024)
             message = message.decode('ascii')
+            if self.user in chatMode:
+                target=chatMode[self.user]
+                if message=="leave":
+                    chatMode.pop(self.user)
+                    chatMode.pop(target)
+                else:
+                    message = "<{}> {}".format(self.user,message)
+                    online[target].sendall(message.encode('ascii'))
+                    continue
             send = re.match('send\s+(.*)\s+(.*)', message)
             if send:
                 if send.group(1) in online:
@@ -160,6 +173,35 @@ class Accept(Thread):
                     con.commit()
                     message = "{} has been remove from your friends".format(removeFriend.group(1))
                     sock.sendall(message.encode('ascii'))
+            chat = re.match('chat (.+)', message)
+            if chat:
+                target = chat.group(1)
+                if target not in online:
+                    message = "{} is not online now".format(target)
+                    sock.sendall(message.encode('ascii'))
+                else:
+                    message = "chatRequest {}".format(self.user)
+                    online[target].sendall(message.encode('ascii'))
+                    while self.user not in chatSignal:
+                        pass
+                    if chatSignal[self.user] == "Reject":
+                        message =  "{} reject your chat request".format(target)
+                        sock.sendall(message.encode('ascii'))
+                        chatSignal.pop(self.user)
+                    if chatSignal[self.user] == "Accept":
+                        chatMode[self.user] = target
+                        chatMode[target] = self.user
+                        message = "{} accept yout invite".format(target)
+                        sock.sendall(message.encode('ascii'))
+
+            chatReject = re.match('chatReject (.+)', message)
+            if chatReject:
+                target = chatReject.group(1)
+                chatSignal[target]="Reject"
+            chatAccept = re.match('chatAccept (.+)', message)
+            if chatAccept:
+                target = chatAccept.group(1)
+                chatSignal[target]="Accept"
 
 
 if __name__ == '__main__':
