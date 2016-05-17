@@ -1,7 +1,6 @@
-# Chat Server/Client
-
-
+# Chat Server/Client  
 This is a simple implement of chat server and client with python 3.
+
 ===
 ### Server usage
 Start the server binding wild and port 5000.
