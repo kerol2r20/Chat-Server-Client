@@ -53,7 +53,6 @@ class ServerReply(threading.Thread):
                             while 'Ack' not in sendfileRequest:
                                 pass
                             if sendfileRequest['Ack']=='Accept':
-                                print("We can start transfer file")
                                 sendfileRequest.pop('Ack')
                                 binary = open(file.group(2),'rb')
                                 print("Load file to buffer...")
@@ -108,8 +107,10 @@ def RecvMsg(sock):
             return
         if reply=='SendfileACK Accept':
             sendfileRequest['Ack']='Accept'
+            continue
         if reply=='SendfileACK Reject':
-            sendfileRequest['Ack']='Reject'  
+            sendfileRequest['Ack']='Reject'
+            continue
         chatRequest = re.match("chatRequest (.+)",reply)
         if chatRequest:
         	target = chatRequest.group(1)
