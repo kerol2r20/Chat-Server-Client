@@ -32,7 +32,12 @@ class ServerReply(threading.Thread):
         sock.connect(('127.0.0.1', 5000))
         message = '{},{}'.format(self.user,self.pw)
         sock.sendall(message.encode('ascii'))
-        message = sock.recv(1024).decode('ascii')
+        try:
+            message = sock.recv(1024).decode('ascii')
+        except (OSError, ConnectionResetError):
+            print("Server disconnect")
+            sock.close()
+            exit()
         if(message=="succ"):
             print("Login Success")
             helpinfo()
@@ -91,7 +96,12 @@ def RecvMsg(sock):
     global sendfileRequest
     global prefix
     while True:
-        reply = sock.recv(1024)
+        try:
+            reply = sock.recv(1024)
+        except (OSError, ConnectionResetError):
+            print("Server disconnect")
+            sock.close()
+            exit()
         reply = reply.decode('ascii')
         sendfile = re.match("sendfile (.*),(.*),(.*)",reply)
         if sendfile:
