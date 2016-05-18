@@ -35,7 +35,10 @@ class Accept(Thread):
         global chatSignal
         global chatMode
         sock, address = self.listener.accept()
-        message = sock.recv(1024).decode('ascii')
+        try:
+            message = sock.recv(1024).decode('ascii')
+        except (OSError, ConnectionResetError):
+            print("Remote socket close")
         new = re.match('new (.*),(.*)',message)
         if new:
             query = db.execute('SELECT * FROM user WHERE name="{}"'.format(new.group(1)))
@@ -71,7 +74,13 @@ class Accept(Thread):
             db.execute('DELETE FROM offmsg where receiver="{}"'.format(self.user))
             con.commit()
         while True:
-            message = sock.recv(1024)
+            try:
+                message = sock.recv(1024)
+            except (OSError, ConnectionResetError):
+                online[self.user].close()
+                online.pop(self.user)
+                print("{} dissconect".format(self.user))
+                exit()
             message = message.decode('ascii')
             if self.user in chatMode:
                 target=chatMode[self.user]

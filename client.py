@@ -85,7 +85,7 @@ class ServerReply(threading.Thread):
                         message = message.encode('ascii')
                         sock.sendall(message)
         else:
-            print("Login Error")
+            print("Login error Please try again")
             sock.close()
 
 def RecvMsg(sock):
