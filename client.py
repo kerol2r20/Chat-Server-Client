@@ -9,6 +9,17 @@ queueinput = queue.Queue()
 prefix = ""
 sendfileRequest = {}
 
+def helpinfo():
+	print("************   Help   ************")
+	print("1. send <msg> <username>: Send message to target. If taget is not online now, the message will save to offline buffer.")
+	print("2. chat <username>: Invite someone chat with you.")
+	print("3. leave: Leave chatroom.")
+	print("4. friend list: List all your friend and show you their status.")
+	print("5. friend <add/remove> <username>: Add/remove someone from your friend list.")
+	print("6. sendfile <user> <filename>: Send someone file.")
+	print("7. logout: Log out from chat server.")
+	print("**********************************")
+
 class ServerReply(threading.Thread):
     def __init__(self,user,pw):
         super(ServerReply, self).__init__()
@@ -24,10 +35,14 @@ class ServerReply(threading.Thread):
         message = sock.recv(1024).decode('ascii')
         if(message=="succ"):
             print("Login Success")
+            helpinfo()
             threading.Thread(target=RecvMsg,args=(sock,)).start()
             while True:
                 while not queueinput.empty():
                     message = queueinput.get()
+                    if message == "help":
+                    	helpinfo()
+                    	continue
                     file = re.match('sendfile\s+(.*)\s(.*)', message)
                     if file:
                         if os.path.isfile(file.group(2)):
