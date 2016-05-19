@@ -18,6 +18,7 @@ def helpinfo():
 	print("5. friend <add/remove> <username>: Add/remove someone from your friend list.")
 	print("6. sendfile <user> <filename>: Send someone file.")
 	print("7. logout: Log out from chat server.")
+	print("8. help: Show the help message.")
 	print("**********************************")
 
 class ServerReply(threading.Thread):
@@ -39,7 +40,7 @@ class ServerReply(threading.Thread):
             sock.close()
             exit()
         if(message=="succ"):
-            print("Login Success")
+            print("Welcome! You Login Success")
             helpinfo()
             threading.Thread(target=RecvMsg,args=(sock,)).start()
             while True:
@@ -108,6 +109,7 @@ def RecvMsg(sock):
             print("{} will send you {} with {} byte. Would you want it (y/n)?".format(sendfile.group(1),sendfile.group(2),sendfile.group(3)))
             prefix="sendfileACK {} {}".format(sendfile.group(1),sendfile.group(3))
             buff = sock.recv(int(sendfile.group(3)))
+            print("Data have recv {}/{}".format(len(buff),sendfile.group(3)))
             f = open(sendfile.group(2),'wb')
             f.write(buff)
             f.close()
